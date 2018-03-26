@@ -1,0 +1,227 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Foot Ball</title>
+
+<script src="https://code.createjs.com/createjs-2015.11.26.min.js"></script>
+<script>var zon = true; // true for comments from zim code</script>
+<script src="https://d309knd7es5f10.cloudfront.net/zim_6.9.0.js"></script>
+
+<!-- physics libraries -->
+<script src="https://d309knd7es5f10.cloudfront.net/Box2dWeb-2.1.a.3.min.js"></script>
+<script src="https://d309knd7es5f10.cloudfront.net/physics_0.3.0.js"></script><!-- helper code for box2D -->
+
+<style>body {background-color:#999}</style>
+
+<script>
+
+var frame = new zim.Frame("fit", 1000, 800);
+frame.on("ready", function() {
+	zog("ready from ZIM Frame");
+
+	var stage = frame.stage;
+	var stageW = frame.width;
+	var stageH = frame.height;
+	frame.color = frame.light;
+
+	frame.loadAssets(["player.png", "football.png", "bkg.jpg", "star.png", "sprite.png"], "assets/");
+
+	frame.on("complete", function() {
+        document.execCommand('Refresh');
+        var bkg = frame.asset("bkg.jpg").sca(0.85).center(stage).alp(0.5);
+		// var player = frame.asset("player.png").pos(null, 300).sca(0.6).reg(null, 650);
+		// player.center(stage);
+		var player = frame.asset("sprite.png").pos(null, 300);
+        var playerSprite = new Sprite({
+			image:player,
+			cols:4,
+			rows:1,
+			animations:{ready:1, kick:[0,4]}
+        });
+		playerSprite.sca(0.6).reg(null, 650).center(stage).mov(200,null);
+        playerSprite.run({
+			label: "ready",
+			time:1000,
+			rewind: true,
+			// loopWait:3000,
+			loop:true
+        });
+
+		var shoe = new Circle(10,frame.blue).addTo(stage).alp(0.05);
+		var star = frame.asset("star.png").sca(0.75).pos(-100,-100).addTo(stage);
+		var ground = new Rectangle(stageW, 31, frame.green).addTo(stage).pos(0, stageH-31).alp(0.05);
+		var j = 0;
+		var k = 0;
+
+		// var c = new Circle(100, "orange")
+	 //        .center(stage)
+	 //        .drag();
+		// c.on("click", function() {
+	 //        // zog(playerSprite.x, playerSprite.y);
+	 //        zog("123");
+	 //    });
+	 //    stage.update();
+	// 1. make borders for the world
+	// this stops stuff from going off the screen
+	// but also could stop things from falling in through the top of the screen
+	// var borders = {x:0, y:0, width:stageW, height:stageH};
+
+	// 2. make a new Physics object passing in the ZIM frame and borders
+	// it needs a frame so it can get scale to match the debug canvas
+
+	var fromBottom = 30;
+	var borders = {x:0, y:0, width:stageW, height:stageH-fromBottom};
+	var physics = new zim.Physics(frame, borders, 4);
+
+	var ballBounceBody = physics.makeCircle(50,null,null,null,null,0.9);
+	ballBounceBody.x = stageW/3;
+	ballBounceBody.y = stageH/2+100;
+	var ballBounce = frame.asset("football.png").sca(0.135).centerReg();
+	physics.addMap(ballBounceBody, ballBounce);
+
+	var posArr = [
+		{x:100,y:100},
+		{x:135,y:175},
+		{x:160,y:250},
+		{x:190,y:100},
+		{x:240,y:175},
+		{x:300,y:250},
+		{x:325,y:175},
+		{x:350,y:100},
+		{x:475,y:100},
+		{x:475,y:175},
+		{x:475,y:250},
+		{x:600,y:100},
+		{x:600,y:175},
+		{x:600,y:250},
+		{x:655,y:145},
+		{x:695,y:205},
+		{x:750,y:100},
+		{x:750,y:175},
+		{x:750,y:250},
+	];
+
+	function kick() {
+		shoe.pos(playerSprite.x, playerSprite.y+20);
+			if (playerSprite.x > stageW/3*2) {
+				playerSprite.scaleX = 0.6;
+			} else if (playerSprite.x < stageW/3){
+				playerSprite.scaleX = -0.6;
+			}
+		
+	        if (shoe.hitTestBounds(ballBounce)) {
+				zog("hit");
+				if (j<19) {
+					var starNew = star.clone().sca(0.35).pos(posArr[j].x+25,posArr[j].y-50).addTo(stage);
+					j++;
+				} else {
+					youWin();
+					kickInterval.clear();
+				}
+
+				var powerDir = ballBounce.x - shoe.x;
+				playerSprite.run({
+					label: "kick",
+					time:500,
+					rewind: false,
+					loop:false
+		        });
+				zog(powerDir);
+				ballBounceBody.ApplyImpulse(
+					new b2Vec2(powerDir, -100),
+					new b2Vec2(shoe.x/physics.scale, ballBounceBody.GetWorldCenter().y)
+				);
+			}else if (ground.hitTestBounds(ballBounce) && j>0) {
+				youLose();
+				kickInterval.clear();
+			}
+		};//end of kick
+
+	// bkg.on("click", function() {
+	//     // zog("123");
+	//     // zog(playerSprite.x, playerSprite.y);
+	//     if (playerSprite.y<530) {
+	// 		zog("<530");
+	// 		controller.diagonal = false;
+	// 	}
+	// 	// else{
+	// 	// 	controller.enabled = false;
+	// 	// }
+	// });
+
+    var kickInterval = interval(100, kick);
+
+	var bound = new createjs.Rectangle(100,530,stageW-200,170);
+	var controller = new MotionController({
+	   container:stage,
+	   target:playerSprite,
+	   type:"mousemove",
+	   rect:bound,
+	   diagonal:true,
+	   damp:.5,
+	});
+
+
+
+	stage.update();
+
+	function youWin(){
+		endImage();
+
+		var labelWin = new Label({
+		   text:"YOU WIN!",
+		   size:100,
+		   color:"white",
+		});
+		labelWin.center(stage).mov(null, -100);
+		for (var i = 0; i < posArr.length; i++) {
+			var starNew = star.clone().sca(0.35).pos(posArr[i].x+25,posArr[i].y-50).addTo(stage);
+		}
+		btnAll();
+		zog("you win");
+	}
+
+	function youLose(){
+		endImage();
+		var labelLose = new Label({
+		   text:"YOU LOSE!",
+		   size:100,
+		   color:"white",
+		});
+		labelLose.center(stage).mov(null, -100);
+		btnAll();
+		zog("you lose");
+	}
+
+	function btnAll(){
+		var labelAll = new Label({
+		   text:"TRY AGAIN",
+		   size:40,
+		   color:"white",
+		   fontOptions:"bold"
+		});
+		var btnAll = new Button({
+			label:labelAll,
+		    width:320,
+		    height:80
+		});
+		btnAll.center(stage).mov(null, 20);
+		btnAll.on("click", function(){
+			location.reload();
+		})
+	} 
+
+	function endImage(){
+		var bg = new Rectangle(stageW,stageH, frame.black).alp(0.5).center(stage);
+	}
+
+	})
+});
+
+</script>
+</head>
+
+<body>
+</body>
+</html>
